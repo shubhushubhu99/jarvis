@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS AI Voice Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Animation -->
+    <div class="background">
+        <div class="particles-container" id="particlesContainer"></div>
+        <div class="gradient-animation"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header Section -->
+        <header class="header">
+            <div class="header-title">
+                <h1>JARVIS</h1>
+                <p class="subtitle">Just A Rather Very Intelligent System</p>
+            </div>
+            <div class="status-indicator">
+                <div class="status-light" id="statusLight"></div>
+                <span class="status-text" id="statusText">Idle</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Voice Recognition Section -->
+            <section class="voice-section">
+                <!-- Animated Circle Waveform -->
+                <div class="waveform-container">
+                    <div class="waveform" id="waveform">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="pulse-circle" id="pulseCircle"></div>
+                </div>
+
+                <!-- Microphone Button -->
+                <button class="mic-button" id="micButton" title="Click to speak or press 'M'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v12a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                    <span id="micLabel">Activate</span>
+                </button>
+
+                <!-- Control Buttons -->
+                <div class="control-buttons">
+                    <button class="control-btn" id="clearHistoryBtn" title="Clear history (C)">
+                        <span>Clear</span>
+                    </button>
+                    <button class="control-btn" id="toggleHistoryBtn" title="Toggle history panel (H)">
+                        <span>History</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Display Section -->
+            <section class="display-section">
+                <!-- Current Input/Output -->
+                <div class="display-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Terminal Output</span>
+                        <div class="panel-indicators">
+                            <span class="indicator" id="inputIndicator"></span>
+                            <span>Active</span>
+                        </div>
+                    </div>
+                    
+                    <div class="display-content" id="displayContent">
+                        <div class="welcome-message">
+                            <p>👋 Welcome to JARVIS</p>
+                            <p>Say "Hey Jarvis" to activate voice assistant</p>
+                            <p style="font-size: 0.85em; margin-top: 1em; opacity: 0.6;">
+                                Press <kbd>M</kbd> to activate manually or <kbd>H</kbd> for history
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="input-line" id="inputLine">
+                        <span class="cursor" id="cursor">▊</span>
+                    </div>
+                </div>
+
+                <!-- Command History Panel -->
+                <aside class="history-panel" id="historyPanel">
+                    <div class="panel-header">
+                        <span class="panel-title">Command History</span>
+                        <button class="close-btn" id="closeHistoryBtn">✕</button>
+                    </div>
+                    <div class="history-content" id="historyContent">
+                        <p class="history-empty">No commands yet</p>
+                    </div>
+                </aside>
+            </section>
+
+            <!-- Response Section -->
+            <section class="response-section">
+                <div class="response-box" id="responseBox">
+                    <div class="response-header">JARVIS Response</div>
+                    <div class="response-text" id="responseText">
+                        Ready to assist...
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Type commands or use voice. Available: time, date, search [query], open [site], tell me [question]</p>
+        </footer>
+    </div>
+
+    <!-- Loading Spinner (hidden initially) -->
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+</body>
+</html>
