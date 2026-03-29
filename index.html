@@ -25,6 +25,12 @@
                 <div class="status-light" id="statusLight"></div>
                 <span class="status-text" id="statusText">Idle</span>
             </div>
+            <button class="settings-btn" id="settingsBtn" title="Configure OpenAI API">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+                </svg>
+            </button>
         </header>
 
         <!-- Main Content -->
@@ -125,6 +131,32 @@
     <div class="loader" id="loader">
         <div class="spinner"></div>
         <p>Processing...</p>
+    </div>
+
+    <!-- API Settings Modal -->
+    <div class="modal" id="apiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>OpenAI API Configuration</h2>
+                <button class="modal-close" id="closeModalBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Configure your OpenAI API key to enable dynamic AI responses.</p>
+                <p class="info-text">Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a></p>
+                <div class="form-group">
+                    <label for="apiKeyInput">API Key:</label>
+                    <input type="password" id="apiKeyInput" placeholder="sk-..." />
+                </div>
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="useOpenAICheckbox" />
+                    <label for="useOpenAICheckbox">Enable OpenAI responses</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="clearApiKeyBtn">Clear Key</button>
+                <button class="btn-primary" id="saveApiKeyBtn">Save & Enable</button>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

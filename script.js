@@ -11,7 +11,228 @@ const state = {
     wakeWordDetected: false,
     currentTranscript: '',
     recognitionAttempts: 0,
+    openaiKey: localStorage.getItem('openaiKey') || null,
+    useOpenAI: localStorage.getItem('useOpenAI') === 'true' || false,
 };
+
+// ==================== OPENAI API INTEGRATION ====================
+/**
+ * Set OpenAI API key
+ */
+function setOpenAIKey(key) {
+    state.openaiKey = key;
+    localStorage.setItem('openaiKey', key);
+    state.useOpenAI = true;
+    localStorage.setItem('useOpenAI', 'true');
+    console.log('[OPENAI] API key configured');
+    console.log('[OPENAI] State updated - useOpenAI:', state.useOpenAI, 'hasKey:', !!state.openaiKey);
+    showNotification('✓ OpenAI API key configured successfully', 'success');
+    
+    // Test the API key immediately
+    testOpenAIKey(key);
+}
+
+/**
+ * Test if OpenAI API key is valid
+ */
+async function testOpenAIKey(key) {
+    try {
+        console.log('[OPENAI] Testing API key...');
+        console.log('[OPENAI] Testing with model: gpt-3.5-turbo');
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${key}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-3.5-turbo',
+                messages: [{ role: 'user', content: 'test' }],
+                max_tokens: 10,
+            }),
+        });
+
+        console.log('[OPENAI] Test Response Status:', response.status);
+        const data = await response.json();
+        
+        if (response.ok) {
+            console.log('[OPENAI] ✓ API key is VALID and working!');
+            console.log('[OPENAI] Model response:', data.choices[0].message.content);
+            showNotification('✓ API key verified and working!', 'success');
+            return true;
+        } else {
+            console.error('[OPENAI] API Error Response:', data);
+            const errorMsg = data.error?.message || 'Unknown error';
+            const errorType = data.error?.type || 'unknown';
+            
+            console.error('[OPENAI] Error Type:', errorType);
+            console.error('[OPENAI] Error Message:', errorMsg);
+            
+            // Provide specific guidance based on error
+            let userMessage = `❌ API Test Failed (${response.status}): ${errorMsg}`;
+            
+            if (response.status === 401) {
+                userMessage += ' - Invalid or expired API key.';
+            } else if (response.status === 429) {
+                userMessage += ' - Rate limited. Check account quota.';
+            } else if (response.status === 403) {
+                userMessage += ' - Check billing status at openai.com/account/billing';
+            }
+            
+            showNotification(userMessage, 'error');
+            return false;
+        }
+    } catch (error) {
+        console.error('[OPENAI] Error testing key:', error);
+        showNotification(`❌ Network Error: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Clear OpenAI API key
+ */
+function clearOpenAIKey() {
+    state.openaiKey = null;
+    state.useOpenAI = false;
+    localStorage.removeItem('openaiKey');
+    localStorage.setItem('useOpenAI', 'false');
+    console.log('[OPENAI] API key cleared');
+    showNotification('✓ OpenAI API key cleared', 'success');
+}
+
+/**
+ * Show API settings modal
+ */
+function showAPIModal() {
+    if (!elements.apiModal) return;
+    
+    // Always clear the input field for security and to allow fresh paste
+    if (elements.apiKeyInput) {
+        elements.apiKeyInput.value = '';
+        elements.apiKeyInput.placeholder = 'sk-...';
+    }
+    
+    if (elements.useOpenAICheckbox) {
+        elements.useOpenAICheckbox.checked = state.useOpenAI;
+    }
+    
+    elements.apiModal.classList.add('visible');
+    console.log('[MODAL] API settings shown');
+    
+    // Focus on the input field
+    if (elements.apiKeyInput) {
+        setTimeout(() => elements.apiKeyInput.focus(), 100);
+    }
+}
+
+/**
+ * Hide API settings modal
+ */
+function hideAPIModal() {
+    if (!elements.apiModal) return;
+    elements.apiModal.classList.remove('visible');
+    console.log('[MODAL] API settings hidden');
+}
+
+/**
+ * Get dynamic response from OpenAI API
+ */
+async function getOpenAIResponse(userMessage) {
+    if (!state.openaiKey) {
+        console.warn('[OPENAI] No API key configured');
+        return null;
+    }
+
+    try {
+        console.log('[OPENAI] Calling API with message:', userMessage);
+        state.isProcessing = true;
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.openaiKey}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are JARVIS, an AI assistant inspired by Iron Man\'s JARVIS. You are sophisticated, helpful, and speak in a formal yet friendly manner. Keep responses concise and natural.'
+                    },
+                    {
+                        role: 'user',
+                        content: userMessage
+                    }
+                ],
+                max_tokens: 150,
+                temperature: 0.7,
+            }),
+        });
+
+        console.log('[OPENAI] Response status:', response.status);
+        
+        if (!response.ok) {
+            let errorMessage = '';
+            let errorData = null;
+            
+            try {
+                errorData = await response.json();
+                errorMessage = errorData.error?.message || 'Unknown error';
+            } catch (e) {
+                errorMessage = response.statusText || 'Unknown error';
+            }
+            
+            console.error('[OPENAI] API Error - Status:', response.status, 'Message:', errorMessage);
+            
+            // Handle different error types
+            if (response.status === 401) {
+                console.error('[OPENAI] Authentication failed - Invalid or expired API key');
+                showNotification('❌ Invalid OpenAI API key. Please check your key at https://platform.openai.com/api-keys', 'error');
+                state.useOpenAI = false;
+                localStorage.setItem('useOpenAI', 'false');
+            } else if (response.status === 403) {
+                console.error('[OPENAI] Forbidden - Account may not have access');
+                showNotification('❌ Access denied. Check if your account is active and billing is set up.', 'error');
+                state.useOpenAI = false;
+            } else if (response.status === 429) {
+                console.error('[OPENAI] Rate limit exceeded');
+                showNotification('⚠️ Too many requests. Please wait a moment before trying again.', 'error');
+            } else if (response.status === 500 || response.status === 502 || response.status === 503) {
+                console.error('[OPENAI] Server error');
+                showNotification('⚠️ OpenAI service is temporarily unavailable. Please try again later.', 'error');
+            } else {
+                console.error('[OPENAI] API Error:', errorMessage);
+                showNotification(`❌ Error: ${errorMessage}`, 'error');
+            }
+            
+            state.isProcessing = false;
+            return null;
+        }
+
+        const data = await response.json();
+        const aiResponse = data.choices[0].message.content.trim();
+        console.log('[OPENAI] ✓ Response received:', aiResponse.substring(0, 50) + '...');
+        state.isProcessing = false;
+        return aiResponse;
+
+    } catch (error) {
+        console.error('[OPENAI] Network/CORS Error:', error.message);
+        
+        // Check if it's a CORS error
+        if (error.message.includes('CORS') || error.message.includes('cors')) {
+            showNotification('⚠️ CORS Error: Browser cannot reach OpenAI API directly. Using fallback mode.', 'error');
+            console.log('[OPENAI] Suggestion: Use a backend proxy to avoid CORS issues');
+        } else {
+            showNotification('❌ Failed to connect to OpenAI API: ' + error.message, 'error');
+        }
+        
+        state.isProcessing = false;
+        return null;
+    }
+}
 
 // ==================== DOM ELEMENTS (Lazy Loading) ====================
 let elements = {};
@@ -35,6 +256,13 @@ function initializeElements() {
         cursor: document.getElementById('cursor'),
         micLabel: document.getElementById('micLabel'),
         particlesContainer: document.getElementById('particlesContainer'),
+        settingsBtn: document.getElementById('settingsBtn'),
+        apiModal: document.getElementById('apiModal'),
+        closeModalBtn: document.getElementById('closeModalBtn'),
+        apiKeyInput: document.getElementById('apiKeyInput'),
+        useOpenAICheckbox: document.getElementById('useOpenAICheckbox'),
+        saveApiKeyBtn: document.getElementById('saveApiKeyBtn'),
+        clearApiKeyBtn: document.getElementById('clearApiKeyBtn'),
     };
     
     // Verify all elements are loaded
@@ -347,6 +575,35 @@ function handleOpenSite(site) {
  * Handle general conversation
  */
 function handleConversation(command) {
+    console.log('[CONVERSATION] Handling command:', command);
+    console.log('[CONVERSATION] useOpenAI:', state.useOpenAI, 'hasKey:', !!state.openaiKey);
+    
+    // If OpenAI is enabled and key is set, use API
+    if (state.useOpenAI && state.openaiKey) {
+        console.log('[CONVERSATION] Using OpenAI API for response');
+        getOpenAIResponse(command).then(response => {
+            if (response) {
+                console.log('[CONVERSATION] Got OpenAI response');
+                respond(response);
+                displayResponse(response);
+            } else {
+                console.log('[CONVERSATION] OpenAI failed, using fallback');
+                // Fallback to local responses if API fails
+                fallbackConversationResponse(command);
+            }
+        });
+        return;
+    }
+
+    // Fallback to local static responses
+    console.log('[CONVERSATION] Using fallback static responses');
+    fallbackConversationResponse(command);
+}
+
+/**
+ * Fallback conversation handler with static responses
+ */
+function fallbackConversationResponse(command) {
     // JARVIS personality responses
     const responses = {
         'hello': 'Good day. How may I be of service?',
@@ -704,9 +961,79 @@ function attachEventListeners() {
                 if (elements.historyPanel) {
                     elements.historyPanel.classList.remove('visible');
                 }
+                if (elements.apiModal && elements.apiModal.classList.contains('visible')) {
+                    hideAPIModal();
+                }
                 break;
         }
     });
+
+    // Settings button
+    if (elements.settingsBtn) {
+        elements.settingsBtn.addEventListener('click', () => {
+            console.log('[EVENT] Settings clicked');
+            showAPIModal();
+        });
+    }
+
+    // Modal close button
+    if (elements.closeModalBtn) {
+        elements.closeModalBtn.addEventListener('click', () => {
+            console.log('[EVENT] Modal close clicked');
+            hideAPIModal();
+        });
+    }
+
+    // Save API Key button
+    if (elements.saveApiKeyBtn) {
+        elements.saveApiKeyBtn.addEventListener('click', () => {
+            console.log('[EVENT] Save API key clicked');
+            let apiKey = elements.apiKeyInput.value.trim();
+            
+            // If it's masked (contains ...), clear it - user needs to paste full key
+            if (apiKey.includes('...')) {
+                console.log('[MODAL] Masked key detected, clearing field');
+                elements.apiKeyInput.value = '';
+                showNotification('⚠️ Please paste the full API key (it will be masked after saving)', 'warning');
+                return;
+            }
+            
+            if (!apiKey) {
+                showNotification('❌ Please enter an API key', 'error');
+                return;
+            }
+            
+            // Validate it looks like an OpenAI key
+            if (!apiKey.startsWith('sk-')) {
+                showNotification('❌ Invalid API key format. Should start with "sk-"', 'error');
+                return;
+            }
+            
+            console.log('[MODAL] Saving API key, length:', apiKey.length);
+            setOpenAIKey(apiKey);
+            elements.apiKeyInput.value = ''; // Clear the input after saving
+            hideAPIModal();
+        });
+    }
+
+    // Clear API Key button
+    if (elements.clearApiKeyBtn) {
+        elements.clearApiKeyBtn.addEventListener('click', () => {
+            console.log('[EVENT] Clear API key clicked');
+            clearOpenAIKey();
+            if (elements.apiKeyInput) elements.apiKeyInput.value = '';
+            if (elements.useOpenAICheckbox) elements.useOpenAICheckbox.checked = false;
+        });
+    }
+
+    // Close modal when clicking outside
+    if (elements.apiModal) {
+        elements.apiModal.addEventListener('click', (event) => {
+            if (event.target === elements.apiModal) {
+                hideAPIModal();
+            }
+        });
+    }
 
     console.log('[EVENTS] Event listeners attached');
 }
@@ -765,7 +1092,110 @@ function showNotification(message, type = 'info') {
     displayResponse(message);
 }
 
-// ==================== INITIALIZATION ====================
+// ==================== DEBUG & TEST FUNCTIONS ====================
+/**
+ * Full diagnostic check - run this in console to troubleshoot
+ */
+window.diagnoseJarvis = async function() {
+    console.clear();
+    console.log('═══════════════════════════════════════');
+    console.log('🔧 JARVIS DIAGNOSTIC REPORT');
+    console.log('═══════════════════════════════════════');
+    
+    // Check 1: API Key Configuration
+    console.log('\n1️⃣ API KEY CONFIGURATION:');
+    console.log('   API Key Set:', !!state.openaiKey);
+    console.log('   OpenAI Enabled:', state.useOpenAI);
+    if (state.openaiKey) {
+        console.log('   Key Length:', state.openaiKey.length);
+        console.log('   Key Preview:', state.openaiKey.substring(0, 15) + '...');
+    }
+    
+    // Check 2: OpenAI Account Status
+    console.log('\n2️⃣ OPENAI ACCOUNT STATUS:');
+    if (!state.openaiKey) {
+        console.warn('   ⚠️ No API key configured. Run: setApiKeyTest("your-key-here")');
+    } else {
+        console.log('   Testing account status...');
+        const isValid = await testOpenAIKey(state.openaiKey);
+        if (isValid) {
+            console.log('   ✓ Account is active and API key is valid');
+        } else {
+            console.error('   ✗ Account issue detected. Check console for details.');
+        }
+    }
+    
+    // Check 3: Browser Capabilities
+    console.log('\n3️⃣ BROWSER CAPABILITIES:');
+    console.log('   Web Speech API:', !!window.SpeechRecognition);
+    console.log('   Speech Synthesis:', !!window.speechSynthesis);
+    console.log('   LocalStorage:', !!window.localStorage);
+    
+    // Check 4: Current State
+    console.log('\n4️⃣ CURRENT STATE:');
+    console.table({
+        'Listening': state.isListening,
+        'Speaking': state.isSpeaking,
+        'Processing': state.isProcessing,
+        'OpenAI Enabled': state.useOpenAI,
+    });
+    
+    console.log('\n═══════════════════════════════════════');
+    console.log('💡 NEXT STEPS:');
+    if (!state.openaiKey) {
+        console.log('   1. Get API key from https://platform.openai.com/api-keys');
+        console.log('   2. Run: setApiKeyTest("sk-...")');
+    } else if (!state.useOpenAI) {
+        console.log('   1. Check OpenAI account at https://platform.openai.com');
+        console.log('   2. Verify billing is active');
+        console.log('   3. Generate a new API key and try again');
+    } else {
+        console.log('   ✓ JARVIS is ready! Try asking it a question.');
+    }
+    console.log('═══════════════════════════════════════\n');
+};
+
+/**
+ * Test the current OpenAI configuration from console
+ */
+window.testJarvisAPI = async function() {
+    console.log('🧪 Testing JARVIS API Configuration...');
+    console.log('-----------------------------------');
+    console.log('API Key Set:', !!state.openaiKey);
+    console.log('OpenAI Enabled:', state.useOpenAI);
+    
+    if (!state.openaiKey) {
+        console.error('❌ No API key configured');
+        console.log('Run: setApiKeyTest("your-api-key-here")');
+        return;
+    }
+    
+    console.log('Testing API call...');
+    const response = await getOpenAIResponse('Say hello');
+    console.log('Response:', response);
+};
+
+/**
+ * Manually set API key from console for testing
+ */
+window.setApiKeyTest = function(key) {
+    console.log('Setting API key from console...');
+    setOpenAIKey(key);
+};
+
+/**
+ * Check current state from console
+ */
+window.checkState = function() {
+    console.log('Current JARVIS State:');
+    console.table({
+        'OpenAI Enabled': state.useOpenAI,
+        'API Key Set': !!state.openaiKey,
+        'Is Listening': state.isListening,
+        'Is Speaking': state.isSpeaking,
+        'Is Processing': state.isProcessing,
+    });
+};
 /**
  * Initialize application when DOM is ready
  */
@@ -793,6 +1223,14 @@ function initApp() {
         // Step 4: Attach event listeners
         console.log('[INIT] Step 4: Attaching event listeners...');
         attachEventListeners();
+
+        // Step 4.5: Check API Key Configuration
+        console.log('[INIT] Step 4.5: Checking OpenAI API Configuration...');
+        console.log('[INIT] OpenAI Enabled:', state.useOpenAI);
+        console.log('[INIT] API Key Saved:', !!state.openaiKey);
+        if (state.openaiKey) {
+            console.log('[INIT] API Key (masked):', state.openaiKey.substring(0, 10) + '...');
+        }
 
         // Step 5: Play welcome message
         console.log('[INIT] Step 5: Playing welcome message...');
